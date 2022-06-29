@@ -128,6 +128,7 @@ programCommand('create-metadata')
 
 programCommand('update-metadata')
   .requiredOption('-m, --mint <string>', 'base58 mint key')
+  .option('-a, --authority <string>', 'base58 authority key')
   .option('-u, --url <string>', 'metadata url')
   .option(
     '-c, --collection <string>',
@@ -145,6 +146,7 @@ programCommand('update-metadata')
       keypair,
       env,
       mint,
+      authority,
       url,
       collection,
       useMethod,
@@ -152,6 +154,10 @@ programCommand('update-metadata')
       verifyCreators,
     } = cmd.opts();
     const mintKey = new PublicKey(mint);
+    let authorityKey = undefined;
+    if (authority) {
+      authorityKey = new PublicKey(authority);
+    }
     const solConnection = new web3.Connection(getCluster(env));
     const walletKeyPair = loadWalletKey(keypair);
     let structuredUseMethod;
@@ -182,6 +188,7 @@ programCommand('update-metadata')
       collectionKey,
       verifyCreators,
       structuredUseMethod,
+      authorityKey
     );
   });
 

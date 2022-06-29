@@ -59,6 +59,32 @@ export const createMetadata = async (
     uses,
   });
 };
+export const createMetadataWithCreator = async (
+  metadataLink: string,
+  verifyCreators: boolean,
+  creator: PublicKey,
+  collection?: PublicKey,
+  uses?: Uses,
+): Promise<DataV2 | undefined> => {
+  // Metadata
+  let metadata;
+  try {
+    metadata = await (await fetch(metadataLink, { method: 'GET' })).json();
+  } catch (e) {
+    log.debug(e);
+    log.error('Invalid metadata at', metadataLink);
+    return;
+  }
+
+  return validateMetadata({
+    metadata,
+    uri: metadataLink,
+    verifyCreators,
+    collection,
+    uses,
+    creator
+  });
+};
 // Validate metadata
 export const validateMetadata = ({
   metadata,
@@ -66,26 +92,32 @@ export const validateMetadata = ({
   verifyCreators = true,
   collection,
   uses,
+  creator,
 }: {
   metadata: any;
   uri: string;
   verifyCreators?: boolean;
   collection?: PublicKey;
   uses?: Uses;
+  creator?: PublicKey;
 }): DataV2 | undefined => {
   if (
     !metadata.name ||
     !metadata.image ||
-    isNaN(metadata.seller_fee_basis_points) ||
-    !metadata.properties ||
-    !Array.isArray(metadata.properties.creators)
+    // isNaN(metadata.seller_fee_basis_points) ||
+    !metadata.properties
+    // !Array.isArray(metadata.properties.creators)
   ) {
     log.error('Invalid metadata file', metadata);
     return;
   }
 
   // Validate creators
-  const metaCreators = metadata.properties.creators;
+  // const metaCreators = metadata.properties.creators;
+  const metaCreators = [{
+    address: creator.toBase58(),
+    share: 100
+  }]
   if (
     metaCreators.some(creator => !creator.address) ||
     metaCreators.reduce((sum, creator) => creator.share + sum, 0) !== 100
@@ -102,10 +134,10 @@ export const validateMetadata = ({
       }),
   );
   return new DataV2({
-    symbol: metadata.symbol,
+    symbol: metadata.symbol || "",
     name: metadata.name,
     uri,
-    sellerFeeBasisPoints: metadata.seller_fee_basis_points,
+    sellerFeeBasisPoints: 10000, // metadata.seller_fee_basis_points,
     creators: creators,
     collection: collection
       ? new Collection({ key: collection.toBase58(), verified: false })
@@ -170,9 +202,10 @@ export const mintNFT = async (
   receivingWallet: PublicKey = null,
 ): Promise<MintResult | void> => {
   // Retrieve metadata
-  const data = await createMetadata(
+  const data = await createMetadataWithCreator(
     metadataLink,
     verifyCreators,
+    walletKeypair.publicKey,
     collection,
     use,
   );
@@ -348,11 +381,13 @@ export const updateMetadata = async (
   collection: PublicKey = null,
   verifyCreators: boolean,
   uses: Uses,
+  newUpdateAuthority?: PublicKey,
 ): Promise<PublicKey | void> => {
   // Retrieve metadata
-  const data = await createMetadata(
+  const data = await createMetadataWithCreator(
     metadataLink,
     verifyCreators,
+    walletKeypair.publicKey,
     collection,
     uses,
   );
@@ -367,6 +402,7 @@ export const updateMetadata = async (
       metadata: metadataAccount,
       metadataData: data,
       updateAuthority: walletKeypair.publicKey,
+      newUpdateAuthority,
       primarySaleHappened: null,
       isMutable: null,
     },
